@@ -40,3 +40,4 @@ ruff>=0.1.0
 mypy>=1.7.0
 
 pydantic-settings
+IPython

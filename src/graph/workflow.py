@@ -171,3 +171,40 @@ class ResearchWorkflow:
             logger.info(f"Cancelled research session: {query_id}")
             return True
         return False
+
+
+def main():
+    """Main function to visualize the LangGraph workflow."""
+    from IPython.display import Image, display
+    
+    # Create the research graph
+    graph = create_research_graph()
+    
+    try:
+        # Try to display the graph using LangGraph's built-in visualization
+        display(Image(graph.get_graph().draw_mermaid_png(output_file_path="temp/workflow.png")))
+        print("✅ LangGraph工作流可视化成功生成！")
+    except Exception as e:
+        print(f"❌ 可视化生成失败: {e}")
+        print("可能需要安装额外的依赖包，如: pip install pygraphviz")
+        
+        # 作为备选方案，打印工作流结构
+        print("\n📊 工作流结构:")
+        print("节点:")
+        print("  - analyze: 分析查询")
+        print("  - plan: 创建研究计划")
+        print("  - dispatch: 分发子代理")
+        print("  - execute: 执行研究")
+        print("  - evaluate: 评估结果")
+        print("  - synthesize: 综合结果")
+        print("  - cite: 添加引用")
+        print("  - complete: 完成研究")
+        
+        print("\n流程:")
+        print("  analyze → plan → dispatch → execute → evaluate")
+        print("  evaluate → [dispatch (继续研究) | synthesize (研究完成)]")
+        print("  synthesize → cite → complete → END")
+
+
+if __name__ == "__main__":
+    main()
