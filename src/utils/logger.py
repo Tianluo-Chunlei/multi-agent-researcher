@@ -27,5 +27,19 @@ if config.debug:
         enqueue=True
     )
 
+def setup_logger(level=None):
+    """Setup logger with specified level."""
+    # Already configured above, this is for compatibility
+    if level:
+        logger.remove()
+        logger.add(
+            sys.stdout,
+            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+            level=level,
+            colorize=True,
+            enqueue=True
+        )
+    return logger
+
 # Export configured logger
-__all__ = ["logger"]
+__all__ = ["logger", "setup_logger"]

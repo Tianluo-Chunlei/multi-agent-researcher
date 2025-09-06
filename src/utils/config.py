@@ -30,16 +30,20 @@ class Config(BaseSettings):
     
     # Model Configuration
     lead_agent_model: str = Field(
-        "claude-3-opus-20240229",
+        "claude-opus-4-1-20250805",
         env="LEAD_AGENT_MODEL"
     )
     subagent_model: str = Field(
-        "claude-3-5-sonnet-20241022",
+        "claude-sonnet-4-20250514",
         env="SUBAGENT_MODEL"
     )
     citation_agent_model: str = Field(
-        "claude-3-5-sonnet-20241022",
+        "claude-sonnet-4-20250514",
         env="CITATION_AGENT_MODEL"
+    )
+    citation_model: str = Field(
+        "claude-sonnet-4-20250514",
+        env="CITATION_MODEL"
     )
     
     # System Configuration
