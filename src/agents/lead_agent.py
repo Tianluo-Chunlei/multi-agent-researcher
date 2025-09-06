@@ -10,6 +10,7 @@ from src.agents.base import BaseAgent
 from src.managers.tool_manager import ToolManager
 from src.utils.logger import logger
 from src.utils.config import config
+from src.prompts.prompt_manager import PromptManager
 
 
 class LeadResearchAgent(BaseAgent):
@@ -574,6 +575,118 @@ Content: {content}
             # Fallback to original method
             return self._extract_report_and_sources(xml_text)
     
+    async def research_with_tools(self, query: str) -> Dict[str, Any]:
+        """
+        ReAct模式研究 - Lead Agent自主决策工具使用
+        基于research_lead_agent.md的新实现
+        """
+        logger.info(f"Starting ReAct research for: {query}")
+        
+        # 获取系统prompt
+        tool_names = [tool.name for tool in self.tools if tool]
+        system_prompt = PromptManager.get_lead_agent_system_prompt(tools=tool_names)
+        
+        # 存储研究状态
+        all_sources = []
+        subagent_results = []
+        iteration = 0
+        max_iterations = 15
+        
+        # ReAct循环
+        conversation = [
+            f"Research Query: {query}\n\nPlease research this query thoroughly. You have access to tools and should use them to gather comprehensive information."
+        ]
+        
+        while iteration < max_iterations:
+            iteration += 1
+            logger.info(f"ReAct iteration {iteration}")
+            
+            # 构建完整prompt
+            full_prompt = f"{system_prompt}\n\n" + "\n".join(conversation)
+            
+            # 获取Agent决策
+            response = await self._call_llm(full_prompt, temperature=0.3)
+            conversation.append(f"Assistant: {response}")
+            
+            # 检查是否完成研究
+            if "complete_task" in response.lower() or "research completed" in response.lower():
+                logger.info("Agent decided research is complete")
+                break
+            
+            # 解析工具调用
+            tool_call = self._parse_tool_call(response)
+            if tool_call:
+                tool_name = tool_call['name']
+                tool_input = tool_call['input']
+                
+                logger.info(f"Using tool: {tool_name} with input: {tool_input[:100]}...")
+                
+                try:
+                    # 执行工具
+                    tool_result = await self.tool_manager.execute_tool(tool_name, **{'query': tool_input})
+                    
+                    # 记录结果
+                    if tool_name == "run_blocking_subagent":
+                        subagent_results.append(tool_result)
+                        if 'sources' in tool_result:
+                            all_sources.extend(tool_result['sources'])
+                    
+                    conversation.append(f"Tool Result ({tool_name}): {str(tool_result)[:1000]}...")
+                    
+                except Exception as e:
+                    error_msg = f"Tool execution failed: {str(e)}"
+                    logger.error(error_msg)
+                    conversation.append(f"Tool Error: {error_msg}")
+            
+            # 检查是否应该停止
+            if iteration >= max_iterations - 2:
+                conversation.append("You are approaching the iteration limit. Please synthesize your findings and complete the research.")
+        
+        # 提取最终报告
+        final_report = self._extract_final_report(conversation)
+        
+        # 返回结果
+        result = {
+            'query': query,
+            'final_report': final_report,
+            'sources': all_sources,
+            'subagent_results': subagent_results,
+            'iterations': iteration,
+            'method': 'react_with_tools'
+        }
+        
+        logger.info(f"ReAct research completed in {iteration} iterations")
+        return result
+    
+    def _parse_tool_call(self, response: str) -> Optional[Dict[str, str]]:
+        """解析工具调用"""
+        import re
+        
+        # 查找Action: 和Action Input: 模式
+        action_match = re.search(r'Action:\s*([^\n]+)', response)
+        input_match = re.search(r'Action Input:\s*([^\n]+)', response)
+        
+        if action_match:
+            tool_name = action_match.group(1).strip()
+            tool_input = input_match.group(1).strip() if input_match else ""
+            
+            return {
+                'name': tool_name,
+                'input': tool_input
+            }
+        
+        return None
+    
+    def _extract_final_report(self, conversation: List[str]) -> str:
+        """从对话中提取最终报告"""
+        # 查找最后几条消息中的报告
+        for message in reversed(conversation[-3:]):
+            if len(message) > 200 and ("report" in message.lower() or "summary" in message.lower()):
+                return message
+        
+        # 如果没找到专门的报告，返回最后的响应
+        return conversation[-1] if conversation else "No final report generated."
+    
     async def execute_task(self, task: str) -> Dict[str, Any]:
         """Execute a task (required by base class).
         
@@ -583,8 +696,5 @@ Content: {content}
         Returns:
             Execution result
         """
-        # Lead agent primarily coordinates, not executes
-        return {
-            "status": "Lead agent coordinates research",
-            "task": task
-        }
+        # 使用新的ReAct模式研究
+        return await self.research_with_tools(task)

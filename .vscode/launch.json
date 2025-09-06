@@ -14,6 +14,17 @@
             "env":{
                 "PYTHONPATH": "${workspaceFolder}"
             }
+        },
+        {
+            "name": "demo",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "demo.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env":{
+                "PYTHONPATH": "${workspaceFolder}"
+            }
         }
     ]
 }

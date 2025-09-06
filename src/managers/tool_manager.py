@@ -4,6 +4,8 @@ from typing import Dict, List, Any, Optional
 from src.tools.base import BaseTool
 from src.tools.search import WebSearchTool, WebFetchTool
 from src.tools.memory import MemoryStoreTool, ResearchPlanMemory
+from src.tools.subagent_tool import SubAgentTool
+from src.tools.citations_tool import CitationsTool
 from src.utils.logger import logger
 
 
@@ -24,6 +26,10 @@ class ToolManager:
         # Memory tools
         self.register_tool(MemoryStoreTool())
         self.register_tool(ResearchPlanMemory())
+        
+        # Agent tools
+        self.register_tool(SubAgentTool())
+        self.register_tool(CitationsTool())
         
         logger.info(f"Initialized {len(self.tools)} tools")
     
@@ -57,8 +63,15 @@ class ToolManager:
             List of available tools
         """
         if agent_type == "lead":
-            # Lead agent gets all tools
-            return list(self.tools.values())
+            # Lead agent gets core research and coordination tools
+            return [
+                self.tools.get("web_search"),
+                self.tools.get("web_fetch"), 
+                self.tools.get("run_blocking_subagent"),
+                self.tools.get("add_citations"),
+                self.tools.get("memory_store"),
+                self.tools.get("research_plan_memory")
+            ]
         elif agent_type == "subagent":
             # Subagents get search and basic memory tools
             return [
