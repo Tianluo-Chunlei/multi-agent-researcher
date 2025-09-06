@@ -1,3 +1,11 @@
+'''
+Author: Chunlei Cai
+Date: 2025-09-06 11:16:17
+LastEditTime: 2025-09-06 15:18:27
+LastEditors: Chunlei Cai
+FilePath: /deep_research/demo.py
+Description: 
+'''
 #!/usr/bin/env python3
 """Demo script for Deep Research system."""
 
@@ -34,7 +42,7 @@ async def main():
     
     # Demo queries
     queries = [
-        "What is artificial intelligence?",
+        "帮我梳理一下人工智能发展史",
         # "Latest breakthroughs in quantum computing 2024",
         # "How does blockchain technology work?"
     ]

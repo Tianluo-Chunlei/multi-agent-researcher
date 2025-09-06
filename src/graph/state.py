@@ -21,8 +21,9 @@ class ResearchState(TypedDict):
     subagent_count: int
     subagent_tasks: List[Dict[str, Any]]
     
-    # Execution state
+    # Execution state  
     active_subagents: List[str]
+    subagent_tasks_for_execution: List[Dict[str, Any]]  # Tasks stored for execution phase
     completed_subagents: List[str]
     failed_subagents: List[str]
     subagent_results: List[Dict[str, Any]]
@@ -84,6 +85,7 @@ def create_initial_state(query: str) -> ResearchState:
         
         # Execution state
         active_subagents=[],
+        subagent_tasks_for_execution=[],
         completed_subagents=[],
         failed_subagents=[],
         subagent_results=[],

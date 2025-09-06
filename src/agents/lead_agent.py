@@ -3,6 +3,8 @@
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 import json
+import re
+from xml.etree import ElementTree as ET
 
 from src.agents.base import BaseAgent
 from src.managers.tool_manager import ToolManager
@@ -48,18 +50,18 @@ Classify the complexity as one of:
 - "medium": 3-5 subagents, multi-faceted
 - "high": 5-20 subagents, very broad with many components
 
-Respond in JSON format:
-{{
-    "query_type": "...",
-    "complexity": "...",
-    "reasoning": "..."
-}}"""
+Respond in XML format:
+<analysis>
+    <query_type>...</query_type>
+    <complexity>...</complexity>
+    <reasoning>...</reasoning>
+</analysis>"""
 
         response = await self._call_llm(prompt, temperature=0.3)
         
         try:
-            # Parse JSON response
-            analysis = json.loads(response)
+            # Parse XML response
+            analysis = self._parse_xml_analysis(response)
             
             # Validate fields
             if "query_type" not in analysis:
@@ -70,8 +72,8 @@ Respond in JSON format:
             logger.info(f"Query analysis: type={analysis['query_type']}, complexity={analysis['complexity']}")
             return analysis
             
-        except json.JSONDecodeError:
-            logger.warning("Failed to parse analysis JSON, using defaults")
+        except Exception as e:
+            logger.warning(f"Failed to parse analysis XML: {e}, using defaults")
             return {
                 "query_type": "straightforward",
                 "complexity": "simple",
@@ -121,24 +123,30 @@ Each task should have:
 For {query_type} queries:
 {self._get_query_type_guidance(query_type)}
 
-Respond in JSON format:
-{{
-    "subagent_count": {subagent_count},
-    "tasks": [
-        {{
-            "description": "Specific research task description",
-            "search_queries": ["query1", "query2"],
-            "expected_output": "What this task should produce",
-            "tools": ["web_search", "web_fetch"]
-        }}
-    ],
-    "synthesis_approach": "How to combine the results"
-}}"""
+Respond in XML format:
+<plan>
+    <subagent_count>{subagent_count}</subagent_count>
+    <tasks>
+        <task>
+            <description>Specific research task description</description>
+            <search_queries>
+                <query>query1</query>
+                <query>query2</query>
+            </search_queries>
+            <expected_output>What this task should produce</expected_output>
+            <tools>
+                <tool>web_search</tool>
+                <tool>web_fetch</tool>
+            </tools>
+        </task>
+    </tasks>
+    <synthesis_approach>How to combine the results</synthesis_approach>
+</plan>"""
 
         response = await self._call_llm(prompt, temperature=0.5)
         
         try:
-            plan = json.loads(response)
+            plan = self._parse_xml_plan(response)
             
             # Ensure required fields
             if "tasks" not in plan or not plan["tasks"]:
@@ -154,8 +162,8 @@ Respond in JSON format:
             logger.info(f"Created plan with {plan['subagent_count']} tasks")
             return plan
             
-        except json.JSONDecodeError:
-            logger.warning("Failed to parse plan JSON, creating default plan")
+        except Exception as e:
+            logger.warning(f"Failed to parse plan XML: {e}, creating default plan")
             return {
                 "subagent_count": 1,
                 "tasks": [{
@@ -222,25 +230,32 @@ Evaluate:
 2. Are there important gaps or missing perspectives?
 3. Is the information credible and well-sourced?
 
-Respond in JSON format:
-{{
-    "is_complete": true/false,
-    "needs_more": true/false,
-    "completeness_score": 0.0-1.0,
-    "missing_aspects": ["aspect1", "aspect2"],
-    "additional_tasks": [
-        {{
-            "description": "Additional research needed",
-            "search_queries": ["query"],
-            "tools": ["web_search"]
-        }}
-    ]
-}}"""
+Respond in XML format:
+<evaluation>
+    <is_complete>true/false</is_complete>
+    <needs_more>true/false</needs_more>
+    <completeness_score>0.0-1.0</completeness_score>
+    <missing_aspects>
+        <aspect>aspect1</aspect>
+        <aspect>aspect2</aspect>
+    </missing_aspects>
+    <additional_tasks>
+        <task>
+            <description>Additional research needed</description>
+            <search_queries>
+                <query>query</query>
+            </search_queries>
+            <tools>
+                <tool>web_search</tool>
+            </tools>
+        </task>
+    </additional_tasks>
+</evaluation>"""
 
         response = await self._call_llm(prompt, temperature=0.3)
         
         try:
-            evaluation = json.loads(response)
+            evaluation = self._parse_xml_evaluation(response)
             
             # Default values
             if "needs_more" not in evaluation:
@@ -249,8 +264,8 @@ Respond in JSON format:
             logger.info(f"Completeness: {evaluation.get('completeness_score', 0)}, Needs more: {evaluation['needs_more']}")
             return evaluation
             
-        except json.JSONDecodeError:
-            logger.warning("Failed to parse evaluation JSON")
+        except Exception as e:
+            logger.warning(f"Failed to parse evaluation XML: {e}")
             return {
                 "is_complete": iteration >= 2,
                 "needs_more": iteration < 2,
@@ -314,12 +329,23 @@ Create a well-structured report that:
 Format the report in markdown with clear sections.
 Do not include citations in the text - they will be added later.
 
-After the report, list the sources used in JSON format."""
+Respond in XML format:
+<synthesis>
+    <report>
+        [Your comprehensive markdown report here]
+    </report>
+    <sources>
+        <source>
+            <title>Source Title</title>
+            <url>Source URL</url>
+        </source>
+    </sources>
+</synthesis>"""
 
         response = await self._call_llm(prompt, temperature=0.5, max_tokens=8000)
         
         # Extract report and sources
-        report, sources = self._extract_report_and_sources(response)
+        report, sources = self._parse_xml_synthesis(response)
         
         logger.info(f"Synthesized report: {len(report)} chars, {len(sources)} sources")
         
@@ -384,6 +410,169 @@ Content: {content}
             sources = [{"title": "Research Finding", "url": "research"}]
         
         return report, sources
+    
+    def _parse_xml_analysis(self, xml_text: str) -> Dict[str, Any]:
+        """Parse XML analysis response."""
+        try:
+            # Extract XML content
+            xml_match = re.search(r'<analysis>(.*?)</analysis>', xml_text, re.DOTALL)
+            if xml_match:
+                xml_content = f"<analysis>{xml_match.group(1)}</analysis>"
+            else:
+                xml_content = xml_text
+            
+            root = ET.fromstring(xml_content)
+            
+            return {
+                "query_type": root.find('query_type').text if root.find('query_type') is not None else "straightforward",
+                "complexity": root.find('complexity').text if root.find('complexity') is not None else "simple",
+                "reasoning": root.find('reasoning').text if root.find('reasoning') is not None else ""
+            }
+        except Exception as e:
+            logger.warning(f"XML parsing failed: {e}")
+            raise
+    
+    def _parse_xml_plan(self, xml_text: str) -> Dict[str, Any]:
+        """Parse XML plan response."""
+        try:
+            # Extract XML content
+            xml_match = re.search(r'<plan>(.*?)</plan>', xml_text, re.DOTALL)
+            if xml_match:
+                xml_content = f"<plan>{xml_match.group(1)}</plan>"
+            else:
+                xml_content = xml_text
+            
+            root = ET.fromstring(xml_content)
+            
+            # Parse tasks
+            tasks = []
+            tasks_elem = root.find('tasks')
+            if tasks_elem is not None:
+                for task_elem in tasks_elem.findall('task'):
+                    # Parse search queries
+                    queries = []
+                    queries_elem = task_elem.find('search_queries')
+                    if queries_elem is not None:
+                        queries = [q.text for q in queries_elem.findall('query') if q.text]
+                    
+                    # Parse tools
+                    tools = []
+                    tools_elem = task_elem.find('tools')
+                    if tools_elem is not None:
+                        tools = [t.text for t in tools_elem.findall('tool') if t.text]
+                    
+                    task = {
+                        "description": task_elem.find('description').text if task_elem.find('description') is not None else "",
+                        "search_queries": queries,
+                        "expected_output": task_elem.find('expected_output').text if task_elem.find('expected_output') is not None else "",
+                        "tools": tools
+                    }
+                    tasks.append(task)
+            
+            return {
+                "subagent_count": int(root.find('subagent_count').text) if root.find('subagent_count') is not None else len(tasks),
+                "tasks": tasks,
+                "synthesis_approach": root.find('synthesis_approach').text if root.find('synthesis_approach') is not None else "Combine all findings"
+            }
+        except Exception as e:
+            logger.warning(f"XML plan parsing failed: {e}")
+            raise
+    
+    def _parse_xml_evaluation(self, xml_text: str) -> Dict[str, Any]:
+        """Parse XML evaluation response."""
+        try:
+            # Extract XML content
+            xml_match = re.search(r'<evaluation>(.*?)</evaluation>', xml_text, re.DOTALL)
+            if xml_match:
+                xml_content = f"<evaluation>{xml_match.group(1)}</evaluation>"
+            else:
+                xml_content = xml_text
+            
+            root = ET.fromstring(xml_content)
+            
+            # Parse missing aspects
+            missing_aspects = []
+            aspects_elem = root.find('missing_aspects')
+            if aspects_elem is not None:
+                missing_aspects = [a.text for a in aspects_elem.findall('aspect') if a.text]
+            
+            # Parse additional tasks
+            additional_tasks = []
+            tasks_elem = root.find('additional_tasks')
+            if tasks_elem is not None:
+                for task_elem in tasks_elem.findall('task'):
+                    # Parse search queries
+                    queries = []
+                    queries_elem = task_elem.find('search_queries')
+                    if queries_elem is not None:
+                        queries = [q.text for q in queries_elem.findall('query') if q.text]
+                    
+                    # Parse tools
+                    tools = []
+                    tools_elem = task_elem.find('tools')
+                    if tools_elem is not None:
+                        tools = [t.text for t in tools_elem.findall('tool') if t.text]
+                    
+                    task = {
+                        "description": task_elem.find('description').text if task_elem.find('description') is not None else "",
+                        "search_queries": queries,
+                        "tools": tools
+                    }
+                    additional_tasks.append(task)
+            
+            # Parse boolean values
+            is_complete_text = root.find('is_complete').text if root.find('is_complete') is not None else "false"
+            needs_more_text = root.find('needs_more').text if root.find('needs_more') is not None else "true"
+            completeness_score_text = root.find('completeness_score').text if root.find('completeness_score') is not None else "0.5"
+            
+            return {
+                "is_complete": is_complete_text.lower() == "true",
+                "needs_more": needs_more_text.lower() == "true",
+                "completeness_score": float(completeness_score_text),
+                "missing_aspects": missing_aspects,
+                "additional_tasks": additional_tasks
+            }
+        except Exception as e:
+            logger.warning(f"XML evaluation parsing failed: {e}")
+            raise
+    
+    def _parse_xml_synthesis(self, xml_text: str) -> tuple:
+        """Parse XML synthesis response."""
+        try:
+            # Extract XML content
+            xml_match = re.search(r'<synthesis>(.*?)</synthesis>', xml_text, re.DOTALL)
+            if xml_match:
+                xml_content = f"<synthesis>{xml_match.group(1)}</synthesis>"
+            else:
+                xml_content = xml_text
+            
+            root = ET.fromstring(xml_content)
+            
+            # Extract report
+            report_elem = root.find('report')
+            report = report_elem.text if report_elem is not None else xml_text
+            
+            # Extract sources
+            sources = []
+            sources_elem = root.find('sources')
+            if sources_elem is not None:
+                for source_elem in sources_elem.findall('source'):
+                    source = {
+                        "title": source_elem.find('title').text if source_elem.find('title') is not None else "Unknown",
+                        "url": source_elem.find('url').text if source_elem.find('url') is not None else "unknown"
+                    }
+                    sources.append(source)
+            
+            # If no sources found, create default
+            if not sources:
+                sources = [{"title": "Research Finding", "url": "research"}]
+            
+            return report.strip(), sources
+            
+        except Exception as e:
+            logger.warning(f"XML synthesis parsing failed: {e}, using fallback")
+            # Fallback to original method
+            return self._extract_report_and_sources(xml_text)
     
     async def execute_task(self, task: str) -> Dict[str, Any]:
         """Execute a task (required by base class).

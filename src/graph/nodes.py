@@ -92,8 +92,11 @@ async def dispatch_subagents(state: ResearchState) -> ResearchState:
     # Dispatch subagents
     active_agents = await manager.dispatch_agents(state['subagent_tasks'])
     
-    # Update state
+    # Update state - store agent IDs and tasks for reconstruction
     state['active_subagents'] = active_agents
+    # Store a copy of current tasks for execution phase (important: make a copy to avoid reference issues)
+    state['subagent_tasks_for_execution'] = [task.copy() for task in state['subagent_tasks']]
+    logger.info(f"Stored {len(state['subagent_tasks_for_execution'])} tasks for execution")
     state['updated_at'] = datetime.now().isoformat()
     
     logger.info(f"Dispatched {len(active_agents)} subagents")
@@ -113,15 +116,34 @@ async def execute_research(state: ResearchState) -> ResearchState:
     """
     logger.info(f"Executing research with {len(state['active_subagents'])} subagents...")
     
-    # Create subagent manager
+    # Create subagent manager and recreate agents
     manager = SubagentManager()
+    
+    # Recreate agents from stored tasks
+    tasks_for_execution = state.get('subagent_tasks_for_execution', [])
+    logger.info(f"Found {len(tasks_for_execution)} stored tasks for {len(state['active_subagents'])} agents")
+    if len(tasks_for_execution) >= len(state['active_subagents']):
+        # Map agent IDs to their original tasks and recreate agents
+        for i, agent_id in enumerate(state['active_subagents']):
+            if i < len(tasks_for_execution):
+                task = tasks_for_execution[i]
+                # Recreate the subagent
+                subagent = ResearchSubagent(
+                    agent_id=agent_id,
+                    task_description=task.get('description', ''),
+                    tools=task.get('tools', [])
+                )
+                manager.active_agents[agent_id] = subagent
+                logger.debug(f"Recreated subagent {agent_id} for execution")
+    else:
+        logger.warning(f"Task count mismatch: {len(tasks_for_execution)} tasks vs {len(state['active_subagents'])} agents")
     
     # Execute research in parallel
     results = await manager.execute_parallel(state['active_subagents'])
     
     # Process results
     for agent_id, result in results.items():
-        if result['success']:
+        if result.get('success', False):
             state['completed_subagents'].append(agent_id)
             state['subagent_results'].append(result)
             state['raw_results'].extend(result.get('findings', []))
@@ -129,8 +151,10 @@ async def execute_research(state: ResearchState) -> ResearchState:
             state['failed_subagents'].append(agent_id)
             state['error_count'] += 1
     
-    # Clear active subagents
+    # Clear active subagents and tasks
     state['active_subagents'] = []
+    if 'subagent_tasks_for_execution' in state:
+        del state['subagent_tasks_for_execution']
     state['iteration'] += 1
     state['updated_at'] = datetime.now().isoformat()
     
