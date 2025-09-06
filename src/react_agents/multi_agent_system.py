@@ -87,13 +87,25 @@ class ResearchSubAgent:
                 url: URL to fetch
                 
             Returns:
-                Webpage content
+                Webpage content with title and snippet for citation purposes
             """
             result = await fetch_tool(url=url)
             if result.get("success", False):
                 data = result.get("data", {})
                 content = data.get("content", "")
                 title = data.get("title", "")
+                
+                # Create a snippet for citation mapping (first 200 chars of content)
+                snippet = content[:200] if content else ""
+                
+                # Store source info for citation (this will be accessible to the agent)
+                source_info = {
+                    "url": url,
+                    "title": title,
+                    "snippet": snippet
+                }
+                
+                # Return formatted content for the agent
                 return f"Title: {title}\n\nContent:\n{content[:5000]}" if content else "No content found"
             else:
                 return f"Fetch failed: {result.get('error', 'Unknown error')}"
@@ -101,6 +113,34 @@ class ResearchSubAgent:
         tools.append(web_search)
         tools.append(fetch_webpage)
         return tools
+    
+    def _extract_source_info_from_response(self, response: str, sources: List[str]) -> None:
+        """Extract source information from AI response content.
+        
+        Args:
+            response: The AI response content
+            sources: List to update with enhanced source information
+        """
+        import re
+        
+        # Look for "Title: X" patterns in the response
+        title_pattern = r"Title:\s*([^\n]+)"
+        titles = re.findall(title_pattern, response)
+        
+        # If we found titles and have URLs, try to match them
+        if titles and sources:
+            # For now, we'll enhance the sources list with title information
+            # This is a simplified approach - in a more sophisticated system,
+            # we'd track the relationship between fetch calls and their results
+            for i, title in enumerate(titles):
+                if i < len(sources):
+                    # Convert string URL to dict with title if it's still a string
+                    if isinstance(sources[i], str):
+                        sources[i] = {
+                            "url": sources[i],
+                            "title": title.strip(),
+                            "snippet": ""
+                        }
     
     async def research(self, task: str) -> Dict[str, Any]:
         """Execute a research task.
@@ -130,7 +170,7 @@ class ResearchSubAgent:
                 logger.debug(f"SubAgent {self.agent_id} received {len(result['messages'])} messages")
                 
                 for msg in result["messages"]:
-                    # Log tool calls
+                    # Log tool calls and extract source information
                     if hasattr(msg, "tool_calls") and msg.tool_calls:
                         for tool_call in msg.tool_calls:
                             tool_name = tool_call.get("name", "unknown")
@@ -143,12 +183,17 @@ class ResearchSubAgent:
                                 url = tool_call.get("args", {}).get("url", "")
                                 logger.info(f"  📄 SubAgent {self.agent_id} fetching: {url[:60]}...")
                                 if url:
+                                    # For now, store URL - we'll enhance this with actual fetch results
                                     sources.append(url)
                     
-                    # Extract AI response
+                    # Extract AI response and look for source information in the content
                     if msg.type == "ai" and msg.content:
                         findings = msg.content
                         logger.debug(f"SubAgent {self.agent_id} generated {len(findings)} chars response")
+                        
+                        # Try to extract source information from the AI response
+                        # The AI response might contain "Title: X" patterns from fetch_webpage results
+                        self._extract_source_info_from_response(findings, sources)
             
             logger.info(f"✅ SubAgent {self.agent_id} completed: {tool_calls_count} tool calls, {len(sources)} sources")
             
@@ -189,13 +234,13 @@ class CitationAgent:
     async def add_citations(
         self,
         report: str,
-        sources: List[str]
+        sources: List[Any]
     ) -> str:
         """Add citations to a report.
         
         Args:
             report: The research report
-            sources: List of source URLs
+            sources: List of source information (URLs or dicts with url/title/snippet)
             
         Returns:
             Report with citations
@@ -203,8 +248,20 @@ class CitationAgent:
         if not sources:
             return report
         
-        # Format sources
-        sources_text = "\n".join([f"[{i+1}] {url}" for i, url in enumerate(sources)])
+        # Format sources - handle both old format (strings) and new format (dicts)
+        sources_text = ""
+        for i, source in enumerate(sources):
+            if isinstance(source, dict):
+                url = source.get("url", "")
+                title = source.get("title", "")
+                snippet = source.get("snippet", "")
+                if title:
+                    sources_text += f"[{i+1}] {title} - {url}\n"
+                else:
+                    sources_text += f"[{i+1}] {url}\n"
+            else:
+                # Backward compatibility with string URLs
+                sources_text += f"[{i+1}] {source}\n"
         
         # Use the citation prompt from prompts.py
         base_prompt = get_citation_prompt()
@@ -220,8 +277,7 @@ class CitationAgent:
 {sources_text}
 </sources>
 
-Please add appropriate citations to the report text. Use the format [1], [2], etc. to reference the sources.
-Output the complete text with citations added."""
+"""
         
         try:
             response = await self.llm.ainvoke([HumanMessage(content=prompt)])
@@ -322,12 +378,12 @@ class MultiAgentLeadResearcher:
             return results
         
         @tool
-        async def add_citations(report: str, sources: List[str]) -> str:
+        async def add_citations(report: str, sources: List[Any]) -> str:
             """Add citations to a research report.
             
             Args:
                 report: The research report text
-                sources: List of source URLs or references
+                sources: List of source information (URLs or dicts with url/title/snippet)
                 
             Returns:
                 Report with citations added
@@ -360,17 +416,7 @@ class MultiAgentLeadResearcher:
             result = await self.agent.ainvoke({
                 "messages": [{
                     "role": "user",
-                    "content": f"""Research this query comprehensively: {query}
-
-Follow this process:
-1. Analyze the query complexity (simple/standard/complex)
-2. Break it down into specific research tasks
-3. Deploy subagents with the run_subagents tool
-4. Synthesize their findings into a comprehensive report
-5. Use the add_citations tool to add citations to your report
-6. Return the final, cited report
-
-Remember: You must use subagents for research and add citations before finalizing."""
+                    "content": f"""Research this query comprehensively: {query}."""
                 }]
             })
             

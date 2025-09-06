@@ -1,3 +1,11 @@
+'''
+Author: Chunlei Cai
+Date: 2025-09-06 18:05:14
+LastEditTime: 2025-09-06 18:26:24
+LastEditors: Chunlei Cai
+FilePath: /deep_research/tests/unit/test_search_debug.py
+Description: 
+'''
 #!/usr/bin/env python3
 """Debug script to test search functionality."""
 
@@ -6,7 +14,7 @@ import sys
 import os
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+# sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from src.tools.search import WebSearchTool
 from src.utils.logger import logger
@@ -21,6 +29,7 @@ async def test_search():
     # Test search
     try:
         result = await search_tool.execute(query="Python programming", max_results=3)
+        result = await search_tool(query="Python programming", max_results=3)
         print(f"✅ Search successful!")
         print(f"Result keys: {result.keys()}")
         print(f"Success: {result.get('success', 'Not set')}")
@@ -32,6 +41,8 @@ async def test_search():
             print(f"Number of results: {len(results)}")
             if results:
                 print(f"First result: {results[0]}")
+
+                
         
     except Exception as e:
         print(f"❌ Search failed with exception: {e}")

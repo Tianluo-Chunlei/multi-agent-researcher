@@ -5,10 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "test_trace",
+            "name": "test_web_search",
             "type": "debugpy",
             "request": "launch",
-            "program": "src/utils/tracing.py",
+            "program": "tests/unit/test_search_debug.py",
             "console": "integratedTerminal",
             "justMyCode": false,
             "env":{
