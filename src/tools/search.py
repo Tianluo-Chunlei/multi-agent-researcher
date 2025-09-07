@@ -5,9 +5,11 @@ import asyncio
 from typing import Dict, Any, List, Optional
 from bs4 import BeautifulSoup
 from ddgs import DDGS
+from tavily import TavilyClient
 from src.tools.base import BaseTool
 from src.utils.logger import logger
 from src.utils.rate_limiter import search_rate_limited, fetch_rate_limited
+from src.utils.config import config
 
 
 class WebSearchTool(BaseTool):
@@ -67,6 +69,96 @@ class WebSearchTool(BaseTool):
                     "title": f"Fallback Result {i+1}",
                     "snippet": f"Search service temporarily unavailable. This is fallback data.",
                     "url": f"https://example.com/result{i+1}"
+                })
+            
+            return {
+                "query": query,
+                "results": results,
+                "count": len(results),
+                "error": str(e)
+            }
+    
+    def validate_params(self, **kwargs) -> bool:
+        """Validate search parameters."""
+        return "query" in kwargs and kwargs["query"]
+
+
+class TavilyWebSearchTool(BaseTool):
+    """Tool for searching the web using Tavily."""
+    
+    def __init__(self):
+        super().__init__(
+            name="tavily_web_search",
+            description="Search the web for information using Tavily. Returns snippets from search results."
+        )
+        self.client = None
+        if config.tavily_api_key:
+            self.client = TavilyClient(api_key=config.tavily_api_key)
+        
+    @search_rate_limited(tokens=1)
+    async def execute(self, query: str, max_results: int = 10) -> Dict[str, Any]:
+        """Execute web search using Tavily.
+        
+        Args:
+            query: Search query
+            max_results: Maximum number of results to return
+            
+        Returns:
+            Search results in the same format as WebSearchTool
+        """
+        logger.info(f"Searching web with Tavily for: {query}")
+        
+        if not self.client:
+            logger.error("Tavily API key not configured")
+            return {
+                "query": query,
+                "results": [],
+                "count": 0,
+                "error": "Tavily API key not configured"
+            }
+        
+        try:
+            # Run Tavily search in executor to avoid blocking
+            loop = asyncio.get_event_loop()
+            tavily_response = await loop.run_in_executor(
+                None,
+                lambda: self.client.search(
+                    query=query,
+                    max_results=max_results,
+                    include_domains=None,
+                    exclude_domains=None,
+                    include_answer=False,
+                    include_raw_content=False,
+                    include_images=False
+                )
+            )
+            
+            # Format results to match WebSearchTool interface
+            results = []
+            for result in tavily_response.get("results", []):
+                results.append({
+                    "title": result.get("title", ""),
+                    "snippet": result.get("content", ""),
+                    "url": result.get("url", "")
+                })
+            
+            logger.info(f"Found {len(results)} search results with Tavily")
+            
+            return {
+                "query": query,
+                "results": results,
+                "count": len(results)
+            }
+            
+        except Exception as e:
+            logger.error(f"Tavily search failed: {e}")
+            # Fallback to mock results if search fails
+            results = []
+            for i in range(min(3, max_results)):
+                results.append({
+                    "title": f"Tavily Fallback Result {i+1}",
+                    "snippet": f"Tavily search service temporarily unavailable. This is fallback data.",
+                    "url": f"https://example.com/tavily_result{i+1}"
                 })
             
             return {

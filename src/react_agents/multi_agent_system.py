@@ -14,7 +14,7 @@ from langgraph.config import get_stream_writer
 from src.utils.config import config
 from src.utils.logger import logger
 from src.react_agents.prompts import get_lead_agent_prompt, get_subagent_prompt, get_citation_prompt
-from src.tools.search import WebSearchTool, WebFetchTool
+from src.tools.search import WebSearchTool, WebFetchTool, TavilyWebSearchTool
 
 
 class ToolManager:
@@ -26,10 +26,10 @@ class ToolManager:
         self._fetch_tool = None
     
     @property
-    def search_tool(self) -> WebSearchTool:
-        """Get or create search tool instance."""
+    def search_tool(self) -> TavilyWebSearchTool:
+        """Get or create search tool instance using Tavily API."""
         if self._search_tool is None:
-            self._search_tool = WebSearchTool()
+            self._search_tool = TavilyWebSearchTool()
         return self._search_tool
     
     @property
@@ -578,7 +578,7 @@ class MultiAgentLeadResearcher:
 
                             # Extract AI response and look for source information in the content
                             if msg.type == "ai" and msg.content:
-                                logger.debug(f"LeadAgent output: {msg.content[:100]}...")
+                                logger.info(f"LeadAgent output: {msg.content[:100]}...")
                     pass
                 elif stream_node == "values":
                     pass
