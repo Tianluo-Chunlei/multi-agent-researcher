@@ -435,9 +435,6 @@ class MultiAgentLeadResearcher:
         """Get tools for lead agent."""
         tools = []
         
-        # Initialize citation agent for use as a tool
-        citation_agent = CitationAgent()
-        
         # Initialize search tool for simple queries using tool manager
         web_search = tool_manager.create_web_search_tool(agent_type="lead")
         
@@ -486,25 +483,8 @@ class MultiAgentLeadResearcher:
             
             return results
         
-        @tool
-        async def add_citations(report: str, sources: List[Any]) -> str:
-            """Add citations to a research report.
-            
-            Args:
-                report: The research report text
-                sources: List of source information (URLs or dicts with url/title/snippet)
-                
-            Returns:
-                Report with citations added
-            """
-            logger.info(f"🔖 Adding citations to report with {len(sources)} sources")
-            cited_report = await citation_agent.add_citations(report, sources)
-            logger.info("✅ Citations added successfully")
-            return cited_report
-        
         tools.append(web_search)
         tools.append(run_subagents)
-        tools.append(add_citations)
         return tools
     
     async def research(self, query: str) -> Dict[str, Any]:
@@ -525,14 +505,11 @@ class MultiAgentLeadResearcher:
             
             # Use streaming to get real-time updates
             final_report = ""
-            sources_found = []
-            accumulated_message = None  # Accumulate AIMessageChunks properly
             chunk_count = 0
             last_log_time = datetime.now()
 
             messages = []
             last_message = None
-            last_turn_id = -1
             
             # Use messages mode for real-time token streaming
             async for stream_node, chunk in self.agent.astream(
@@ -573,8 +550,6 @@ class MultiAgentLeadResearcher:
                                     elif tool_name == "run_subagents":
                                         logger.info(f" Subagents deployment started")
                                         logger.info("⏱️ NOTE: Subagent execution may take 1-3 minutes...")
-                                    elif tool_name == "add_citations":
-                                        logger.info(f"  🔖 Citations being added")
 
                             # Extract AI response and look for source information in the content
                             if msg.type == "ai" and msg.content:
@@ -585,72 +560,6 @@ class MultiAgentLeadResearcher:
                 elif stream_node == "messages":
                     pass
 
-                continue
-                # Process each chunk - stream_mode="messages" sends tuples with (AIMessageChunk, metadata)
-                if chunk:
-                    # Extract the actual message chunk from the tuple
-                    if isinstance(chunk, tuple):
-                        msg_chunk = chunk[0]  # First element is the AIMessageChunk
-                        metadata = chunk[1] if len(chunk) > 1 else {}
-                        if metadata["langgraph_step"] > last_turn_id:
-                            last_turn_id = metadata["langgraph_step"]
-                            last_message = accumulated_message
-                            if last_message:
-                                messages.append(last_message)
-                            accumulated_message = None
-                        pass
-
-                    else:
-                        msg_chunk = chunk
-                        metadata = {}
-                    
-                    # Accumulate the message chunks using the + operator
-                    if accumulated_message is None:
-                        accumulated_message = msg_chunk
-                    else:
-                        try:
-                            accumulated_message = accumulated_message + msg_chunk
-                        except Exception as e:
-                            logger.debug(f"Could not accumulate chunk: {e}")
-                            continue
-                    
-                    # Process streaming content for real-time display
-                    try:
-                        if hasattr(msg_chunk, 'content') and msg_chunk.content:
-                            # Log token streaming
-                            if chunk_count % 10 == 0:  # Log every 10th chunk to avoid spam
-                                logger.debug(f"🤖 Streaming tokens... ({chunk_count} chunks)")
-                            # TODO: Here you could yield content for real-time UI updates
-                    except Exception as e:
-                        # Skip content access errors during streaming
-                        logger.debug(f"Skipping chunk content access: {e}")
-                        pass
-                    
-                    # Check for tool calls in the accumulated message
-                    try:
-                        if last_message and hasattr(last_message, "tool_calls") and last_message.tool_calls:
-                            for tool_call in last_message.tool_calls:
-                                tool_name = tool_call.get("name", "")
-                                tool_elapsed = (datetime.now() - start_time).total_seconds()
-                                
-                                if tool_name == "web_search":
-                                    query = tool_call.get("args", {}).get("query", "")
-                                    logger.info(f"🔍 Direct web search: {query[:50]}... [at {tool_elapsed:.1f}s]")
-                                elif tool_name == "run_subagents":
-                                    tasks = tool_call.get("args", {}).get("tasks", [])
-                                    logger.info(f"🚀 Subagents deployment started: {len(tasks)} tasks [at {tool_elapsed:.1f}s]")
-                                    logger.info("⏱️ NOTE: Subagent execution may take 1-3 minutes...")
-                                elif tool_name == "add_citations":
-                                    logger.info(f"🔖 Citations being added [at {tool_elapsed:.1f}s]")
-                                    # Extract sources from citation tool call
-                                    sources = tool_call.get("args", {}).get("sources", [])
-                                    sources_found.extend(sources)
-                                    logger.info(f"   Added {len(sources)} sources")
-                    except Exception as e:
-                        # Skip tool call access errors during streaming
-                        logger.debug(f"Skipping tool calls access: {e}")
-                        pass
-            
             logger.info(f"📝 Lead agent completed processing")
             
             # Extract final report from accumulated message
@@ -662,13 +571,11 @@ class MultiAgentLeadResearcher:
             
             logger.info(f"🎉 Multi-agent research completed in {execution_time:.2f}s")
             logger.info(f"📊 Final report: {len(final_report)} characters")
-            logger.info(f"📚 Sources cited: {len(sources_found)}")
             
             return {
                 "success": True,
                 "query": query,
                 "report": final_report,
-                "sources": sources_found,
                 "execution_time": execution_time
             }
             
