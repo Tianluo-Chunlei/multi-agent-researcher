@@ -1,7 +1,7 @@
 '''
 Author: Chunlei Cai
 Date: 2025-09-06 11:16:17
-LastEditTime: 2025-09-06 15:18:27
+LastEditTime: 2025-09-07 09:51:59
 LastEditors: Chunlei Cai
 FilePath: /deep_research/demo.py
 Description: 
@@ -42,7 +42,7 @@ async def main():
     
     # Demo queries
     queries = [
-        "帮我梳理一下人工智能发展史",
+        "请分析会议产品 Granola，通义听悟，AI好记 这三款产品，做一个竞品分析",
         # "Latest breakthroughs in quantum computing 2024",
         # "How does blockchain technology work?"
     ]

@@ -17,6 +17,7 @@ class Config(BaseSettings):
     anthropic_base_url: Optional[str] = Field(None, env="ANTHROPIC_BASE_URL")
     anthropic_api_key: str = Field(..., env="ANTHROPIC_API_KEY")
     langsmith_api_key: Optional[str] = Field(None, env="LANGSMITH_API_KEY")
+    tavily_api_key: Optional[str] = Field(None, env="TAVILY_API_KEY")
     
     # LangSmith Configuration
     langchain_tracing_v2: bool = Field(True, env="LANGCHAIN_TRACING_V2")
