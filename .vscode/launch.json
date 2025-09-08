@@ -5,22 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "test_web_search",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "tests/unit/test_search_debug.py",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "env":{
-                "PYTHONPATH": "${workspaceFolder}"
-            }
-        },
-        {
             "name": "test_multi_agnet",
             "type": "debugpy",
             "request": "launch",
             "program": "multi_reactagent.py",
-            "args": ["我要买一辆车，我有两个孩子，父母和我们住在一起，需要能坐下6个人的车，请帮我详细调研一下现在中国市场上有哪些车可以选择，给我一些具体的购车建议。"],
+            "args": ["我是一个求职者，正在关注北京和创科技公司，帮我深入调研一下他的业务、现金流、团队规模。如果你认为还有其他有用信息，也一并调查清楚后，总结给我。"],
+            // "args": ["我要买一辆车，我有两个孩子，父母和我们住在一起，需要能坐下6个人的车，请帮我详细调研一下现在中国市场上有哪些车可以选择，给我一些具体的购车建议。"],
             // "args": ["我是一个产品经理，请帮我分析会议产品 Granola，通义听悟，AI好记 这三款产品，做一个深入详细的竞品分析，我的目的是想做一款会议纪要的产品，想看看目前竞品的现状，找到一些可以切入的机会点。"],
             // "args": ["我是一个投资人，请帮我分析会议产品 Granola，通义听悟，AI好记 这三款产品，做一个竞品分析，给我一些全面深入的投资建议"],
             // "args": ["请分析会议产品 Granola，通义听悟，AI好记 这三款产品，做一个竞品分析"],

@@ -67,14 +67,14 @@ nodes = {
 
 ```mermaid
 graph TD
-    Start[开始] --> Analyze[查询分析]
-    Analyze --> Plan[制定研究计划]
-    Plan --> CheckComplexity{查询复杂度?}
+    Start[开始] --> Analyze[查询分析Agent]
+    Analyze --> Plan[制定研究计划Agent]
+    Plan --> CheckComplexity{查询复杂度Agent}
     
-    CheckComplexity -->|简单| SingleAgent[创建单个子智能体]
-    CheckComplexity -->|标准| MultiAgent[创建2-3个子智能体]
-    CheckComplexity -->|复杂| ManyAgent[创建3-5个子智能体]
-    CheckComplexity -->|高复杂度| MaxAgent[创建5-20个子智能体]
+    CheckComplexity -->|简单| SingleAgent[创建单个Search智能体]
+    CheckComplexity -->|标准| MultiAgent[创建2-3个Search智能体]
+    CheckComplexity -->|复杂| ManyAgent[创建3-5个Search智能体]
+    CheckComplexity -->|高复杂度| MaxAgent[创建5-20个Search智能体]
     
     SingleAgent --> Execute[并行执行]
     MultiAgent --> Execute
@@ -82,15 +82,14 @@ graph TD
     MaxAgent --> Execute
     
     Execute --> Collect[收集结果]
-    Collect --> Evaluate{评估完整性}
+    Collect --> Evaluate{评估完整性Agent}
     
     Evaluate -->|需要更多信息| MoreResearch[创建补充子智能体]
     MoreResearch --> Execute
     
-    Evaluate -->|信息充足| Synthesize[综合分析]
-    Synthesize --> Citations[添加引用]
-    Citations --> FinalReport[生成最终报告]
-    FinalReport --> End[结束]
+    Evaluate -->|信息充足| Synthesize[综合分析Agent]
+    Synthesize --> Citations[添加引用生成报告Agent]
+    Citations --> End[结束]
 ```
 
 ### 3.3 LangGraph 状态定义

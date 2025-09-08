@@ -3,7 +3,7 @@
 ## 设计理念来源
 
 ### Anthropic 官方指导
-本项目的核心架构深度参考了 [Anthropic 官方多智能体最佳实践文档](https://docs.anthropic.com/en/docs/build-with-claude/develop-agent-workflows)，特别是其中关于：
+本项目的核心架构深度参考了 [Anthropic 官方多智能体最佳实践文档](https://www.anthropic.com/engineering/multi-agent-research-system)，特别是其中关于：
 
 1. **Agent 自主性设计**：每个智能体都应具有独立的推理和决策能力
 2. **任务分解策略**：复杂任务应智能地分解为可并行执行的子任务
@@ -319,9 +319,9 @@ class MultiAgentLeadResearcher:
 
 ## 效果对标分析
 
-### 与 DeepSeek-R1 对比
+### 与 deer-flow 对比
 
-| 维度 | DeepSeek-R1 | Deep Research |
+| 维度 | deer-flow | Deep Research |
 |------|-------------|---------------|
 | **架构复杂度** | 高度复杂 | 极简设计 |
 | **开发周期** | 数月迭代 | 一天完成 |
