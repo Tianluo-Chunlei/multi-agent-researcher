@@ -21,6 +21,35 @@
 - **Lead Agent**: 主导智能体，具有任务分析、动态规划、质量评估、自主调整的完整决策链
 - **Research SubAgent**: 研究子智能体，执行 Lead Agent 动态分配的专项研究任务
 
+
+**架构设计**
+
+
+```mermaid
+graph TD
+    Start[开始] --> Lead[LeadAgent Claude-Opus<br/>自主决策控制<br/>问题识别、定研究计划、
+    子课题拆解、检查结果、
+    重新制定计划部署任务、
+    综合结果、撰写报告、
+    添加引用]
+    
+    Lead -->|研究子课题列表|Deploy[部署子智能体<br/>run_subagents工具]
+    
+    Deploy --> |研究子课题1|SubAgent1[SubAgent1 Claude-Sonnet<br/>专项研究<br/>web search/fetch]
+    Deploy --> |研究子课题2|SubAgent2[SubAgent2 Claude-Sonnet<br/>专项研究<br/>web search/fetch] 
+    Deploy --> |研究子课题N|SubAgentN[SubAgentN Claude-Sonnet<br/>专项研究<br/>web search/fetch]
+    
+    SubAgent1 -->|子课题研究报告与信息来源| Lead
+    SubAgent2 -->|子课题研究报告与信息来源| Lead
+    SubAgentN -->|子课题研究报告与信息来源| Lead
+    
+    Lead --> Report[生成最终报告]
+    Report --> End[结束]
+```
+
+**内在逻辑**
+
+
 ```mermaid
 graph TB
     A[用户查询] --> B[Lead Agent<br/>智能分析]
@@ -98,6 +127,37 @@ python multi_reactagent.py "比较中美欧三地的新能源政策" -o report.m
 - 🧠 **智能质量控制**: 持续评估研究深度，自主决定是否需要补充研究或重新规划
 
 ## 📋 对比方式：传统工作流
+
+**架构设计**
+
+```mermaid
+graph TD
+    Start[开始] --> Analyze[查询分析Agent]
+    Analyze --> Plan[制定研究计划Agent]
+    Plan --> CheckComplexity{查询复杂度Agent}
+    
+    CheckComplexity -->|简单| SingleAgent[创建单个Search智能体
+    （web search/fetch tool）]
+    CheckComplexity -->|标准| MultiAgent[创建3-5个Search智能体
+    web search/fetch tool）]
+    CheckComplexity -->|复杂| ManyAgent[创建5-20个Search智能体
+    （web search/fetch tool）]
+    
+    SingleAgent --> Execute[并行执行]
+    MultiAgent --> Execute
+    ManyAgent --> Execute
+    
+    Execute --> Collect[收集结果]
+    Collect --> Evaluate{评估完整性Agent}
+    
+    Evaluate -->|需要更多信息| MoreResearch[创建补充子智能体]
+    MoreResearch --> Execute
+    
+    Evaluate -->|信息充足| Synthesize[综合分析Agent]
+    Synthesize --> Citations[添加引用生成报告Agent]
+    Citations --> End[结束]
+```
+
 
 **传统实现** - 结构化步骤处理：
 
@@ -247,6 +307,7 @@ python multi_reactagent.py "你的研究问题"
 ## 📚 详细文档
 
 - **[多智能体设计哲学](docs/multi-agent-design-philosophy.md)** - 深入解析架构思路和实现原理
+- **[Workflow实现和主从Agent实现架构对比](docs/arch.md)** - 对比两种实现的架构区别
 - **[React-Agent 架构详解](docs/react-agent-architecture.md)** - 技术架构和核心组件说明  
 - **[实现指南](docs/implementation-guide.md)** - 开发部署和扩展指导
 - **[示例报告](examples/)** - 真实研究案例和输出示例
